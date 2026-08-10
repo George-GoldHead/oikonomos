@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Οικονόμος</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<meta name="theme-color" content="#2A392F">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Οικονόμος">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --paper:#E7E1D0;
+    --paper-light:#F2EEE1;
+    --card:#FBF9F3;
+    --ink:#232C24;
+    --ink-soft:#5B6459;
+    --cover:#2A392F;
+    --cover-light:#3B4F41;
+    --red:#A23E2E;
+    --red-bg:#F5E3DD;
+    --green:#3E6650;
+    --green-bg:#E3ECE2;
+    --line:#C9BE9F;
+    --gold:#9C7A3C;
+    --radius:10px;
+    --font-display: Georgia, 'Iowan Old Style', 'Palatino Linotype', 'Times New Roman', serif;
+    --font-mono: ui-monospace, 'SF Mono', 'Cascadia Mono', Menlo, Consolas, monospace;
+    --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:var(--font-sans); font-size:15px; line-height:1.45;
+    padding-bottom:3rem;
+  }
+  .wrap{max-width:520px; margin:0 auto;}
+  header.cover{
+    background:var(--cover); color:var(--paper-light);
+    padding:1.6rem 1.2rem 1.9rem; position:relative; overflow:hidden;
+  }
+  header.cover .eyebrow{
+    font-family:var(--font-mono); font-size:11px; letter-spacing:.14em;
+    color:#B9C9BB; text-transform:uppercase;
+  }
+  header.cover h1{
+    font-family:var(--font-display); font-weight:700; font-size:32px;
+    margin:.15rem 0 .1rem; letter-spacing:.02em;
+  }
+  header.cover .sub{
+    font-size:13px; color:#C7D3C6; font-style:italic;
+  }
+  .stamp{
+    position:absolute; right:1.1rem; top:1.3rem;
+    width:64px; height:64px; border:2px solid var(--gold); border-radius:50%;
+    color:var(--gold); display:flex; align-items:center; justify-content:center;
+    text-align:center; font-family:var(--font-mono); font-size:9px; letter-spacing:.05em;
+    transform:rotate(-9deg); opacity:.85; line-height:1.25;
+  }
+  .perforation{
+    height:14px; background:var(--paper);
+    background-image: radial-gradient(circle 5px, var(--cover) 5px, transparent 5.5px);
+    background-size: 22px 14px; background-position: 0 -7px; background-repeat:repeat-x;
+    margin-top:-1px;
+  }
+  section{padding:1rem 1rem 0;}
+  .card{
+    background:var(--card); border:1px solid var(--line); border-radius:var(--radius);
+    padding:1rem; margin-bottom:1rem;
+  }
+  h2.section-title{
+    font-family:var(--font-display); font-size:19px; margin:0 0 .8rem; color:var(--ink);
+    display:flex; align-items:center; gap:.5rem;
+  }
+  h2.section-title .bar{width:4px; height:16px; background:var(--gold); display:inline-block; border-radius:2px;}
+  .tabs{display:flex; gap:0; border-bottom:1px solid var(--line); margin-bottom:1rem;}
+  .tab{
+    flex:1; text-align:center; padding:.6rem .4rem; font-weight:600; font-size:14px;
+    background:none; border:none; cursor:pointer; color:var(--ink-soft);
+    border-bottom:3px solid transparent; font-family:var(--font-sans);
+  }
+  .tab.active[data-type="expense"]{color:var(--red); border-color:var(--red);}
+  .tab.active[data-type="income"]{color:var(--green); border-color:var(--green);}
+  label{display:block; font-size:12px; color:var(--ink-soft); margin:.6rem 0 .25rem; font-weight:600;}
+  input, select{
+    width:100%; padding:.6rem .65rem; border:1px solid var(--line); border-radius:8px;
+    background:var(--paper-light); font-size:15px; color:var(--ink); font-family:var(--font-sans);
+  }
+  input:focus, select:focus{outline:2px solid var(--gold); outline-offset:1px;}
+  .row2{display:grid; grid-template-columns:1fr 1fr; gap:.7rem;}
+  button.primary{
+    width:100%; margin-top:1rem; padding:.8rem; border:none; border-radius:8px;
+    font-weight:700; font-size:15px; cursor:pointer; color:var(--paper-light);
+  }
+  button.primary[data-type="expense"]{background:var(--red);}
+  button.primary[data-type="income"]{background:var(--green);}
+  button.secondary{
+    padding:.55rem .8rem; border:1px solid var(--line); border-radius:8px; background:var(--paper-light);
+    font-size:13px; cursor:pointer; color:var(--ink); font-weight:600;
+  }
+  button.link{background:none; border:none; color:var(--ink-soft); text-decoration:underline; cursor:pointer; font-size:13px; padding:.3rem;}
+  .cancel-edit{margin-top:.5rem;}
+  details{margin-bottom:.6rem; border:1px solid var(--line); border-radius:var(--radius); background:var(--card); overflow:hidden;}
+  details > summary{
+    list-style:none; cursor:pointer; padding:.75rem .9rem; display:flex; justify-content:space-between;
+    align-items:center; font-family:var(--font-display); font-size:16px; font-weight:700;
+  }
+  details > summary::-webkit-details-marker{display:none;}
+  summary .chev{font-size:12px; color:var(--ink-soft); transition:transform .15s;}
+  details[open] summary .chev{transform:rotate(90deg);}
+  .month-meta{display:flex; gap:.9rem; font-family:var(--font-mono); font-size:12px; color:var(--ink-soft);}
+  .month-meta b{font-weight:700;}
+  .month-meta .inc{color:var(--green);}
+  .month-meta .exp{color:var(--red);}
+  .details-inner{padding:0 .9rem .9rem;}
+  .catbreak{border-top:1px dashed var(--line); padding-top:.6rem; margin-top:.2rem;}
+  .catline{display:flex; justify-content:space-between; padding:.2rem 0; font-size:13px;}
+  .catline.sub{padding-left:1rem; color:var(--ink-soft); font-size:12.5px;}
+  .catline .amt{font-family:var(--font-mono);}
+  .entries{margin-top:.7rem; border-top:1px solid var(--line); padding-top:.5rem;}
+  .entry{
+    display:flex; justify-content:space-between; align-items:center; gap:.5rem;
+    padding:.55rem .6rem; border-radius:6px; margin-bottom:.35rem;
+  }
+  .entry.expense{background:var(--red-bg);}
+  .entry.income{background:var(--green-bg);}
+  .entry .left{min-width:0;}
+  .entry .date{font-family:var(--font-mono); font-size:11px; color:var(--ink-soft);}
+  .entry .cat{font-weight:600; font-size:13.5px;}
+  .entry .desc{font-size:12.5px; color:var(--ink-soft); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .entry .right{text-align:right; flex-shrink:0;}
+  .entry .amt{font-family:var(--font-mono); font-weight:700; font-size:14.5px;}
+  .entry .amt.expense{color:var(--red);}
+  .entry .amt.income{color:var(--green);}
+  .entry .actions{display:flex; gap:.4rem; margin-top:.25rem;}
+  .icon-btn{
+    border:1px solid var(--line); background:var(--card); border-radius:6px; width:32px; height:32px;
+    cursor:pointer; font-size:14px; color:var(--ink-soft);
+  }
+  .filters{display:flex; gap:.5rem; margin-bottom:.8rem;}
+  .filters input, .filters select{font-size:13px; padding:.5rem;}
+  table.ytable{width:100%; border-collapse:collapse; font-size:13px;}
+  table.ytable th, table.ytable td{padding:.4rem .3rem; text-align:right; border-bottom:1px solid var(--line); font-family:var(--font-mono);}
+  table.ytable th:first-child, table.ytable td:first-child{text-align:left; font-family:var(--font-sans);}
+  table.ytable tfoot td{font-weight:700; border-top:2px solid var(--ink); border-bottom:none;}
+  .empty{text-align:center; color:var(--ink-soft); padding:1.5rem 1rem; font-size:14px;}
+  .export-grid{display:grid; grid-template-columns:1fr 1fr; gap:.6rem; margin-bottom:.7rem;}
+  .import-row{display:flex; gap:.5rem; align-items:center; margin-top:.5rem;}
+  .danger-zone{margin-top:1rem; padding-top:.8rem; border-top:1px dashed var(--line);}
+  .danger-zone button{background:var(--red-bg); color:var(--red); border:1px solid var(--red);}
+  footer.note{padding:1rem 1.2rem 2rem; font-size:11.5px; color:var(--ink-soft); text-align:center; line-height:1.6;}
+  .toast{
+    position:fixed; bottom:1rem; left:50%; transform:translateX(-50%);
+    background:var(--cover); color:var(--paper-light); padding:.6rem 1.1rem; border-radius:8px;
+    font-size:13px; z-index:50; opacity:0; pointer-events:none; transition:opacity .25s;
+  }
+  .toast.show{opacity:1;}
+  select#analysisYear, select#analysisGroup, select#yearlySelect{width:auto; display:inline-block; margin-right:.5rem;}
+  .month-strip{display:flex; gap:.4rem; overflow-x:auto; padding-bottom:.3rem;}
+  .month-pill{flex:0 0 auto; background:var(--paper-light); border:1px solid var(--line); border-radius:8px; padding:.4rem .65rem; text-align:center;}
+  .month-pill .mlabel{display:block; color:var(--ink-soft); font-size:10px; letter-spacing:.05em; font-family:var(--font-mono);}
+  .month-pill .mval{display:block; font-weight:700; color:var(--red); font-family:var(--font-mono); font-size:13px;}
+  .month-pill.total{background:var(--cover); border-color:var(--cover);}
+  .month-pill.total .mlabel{color:#B9C9BB;}
+  .month-pill.total .mval{color:var(--paper-light);}
+  .subhead{font-size:12px; color:var(--ink-soft); margin-bottom:.6rem;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="cover">
+  <div class="stamp" id="stampDate">ΟΙΚΟΝΟΜΟΣ<br>ΛΟΓΙΣΤΙΚΟ</div>
+  <div class="eyebrow">Οικογενειακό λογιστικό</div>
+  <h1>Οικονόμος</h1>
+  <div class="sub">έσοδα &amp; έξοδα σπιτιού, με τάξη</div>
+</header>
+<div class="perforation"></div>
+
+<div class="perforation"></div>
+
+<div id="storageBanner" style="display:none; background:#F5E3DD; color:var(--red); font-size:12.5px; padding:.7rem 1.2rem; text-align:center; line-height:1.5;">
+  ⚠️ Ο browser σου μπλόκαρε την τοπική αποθήκευση εδώ (συχνά συμβαίνει σε ιδιωτική περιήγηση) — οι καταχωρήσεις θα κρατηθούν μόνο όσο έχεις ανοιχτή τη σελίδα. Εξήγαγε σε JSON τακτικά (ενότητα «Εξαγωγή / Εισαγωγή») για να μη χάνεις δεδομένα.
+</div>
+
+<section id="formSection">
+  <div class="card">
+    <div class="tabs">
+      <button class="tab active" data-type="expense" id="tabExpense">Έξοδο</button>
+      <button class="tab" data-type="income" id="tabIncome">Έσοδο</button>
+    </div>
+    <form id="entryForm">
+      <div class="row2">
+        <div>
+          <label for="entryDate">Ημερομηνία</label>
+          <input type="date" id="entryDate" required>
+        </div>
+        <div>
+          <label for="entryAmount">Ποσό (€)</label>
+          <input type="text" inputmode="decimal" id="entryAmount" placeholder="π.χ. 25,50" required>
+        </div>
+      </div>
+      <label for="entryCategory">Κατηγορία</label>
+      <select id="entryCategory"></select>
+      <label for="entryDesc">Περιγραφή</label>
+      <input type="text" id="entryDesc" placeholder="προαιρετική σημείωση...">
+      <button type="submit" class="primary" data-type="expense" id="submitBtn">Καταχώρηση εξόδου</button>
+      <button type="button" class="link cancel-edit" id="cancelEditBtn" style="display:none;">Ακύρωση επεξεργασίας</button>
+    </form>
+  </div>
+</section>
+
+<div class="perforation"></div>
+
+<section>
+  <h2 class="section-title"><span class="bar"></span>Μηνιαία κίνηση</h2>
+  <div class="filters">
+    <input type="text" id="searchInput" placeholder="Αναζήτηση σε περιγραφή...">
+    <select id="filterCategory"><option value="">Όλες οι κατηγορίες</option></select>
+  </div>
+  <div id="monthsContainer"></div>
+</section>
+
+<section>
+  <details id="yearlyDetails">
+    <summary><span>Ετήσια σύνοψη</span><span class="chev">▸</span></summary>
+    <div class="details-inner">
+      <label for="yearlySelect" style="display:inline;">Έτος</label>
+      <select id="yearlySelect"></select>
+      <div id="monthStrip" class="month-strip" style="margin-top:.6rem;"></div>
+      <div id="yearlyTableWrap" style="margin-top:.9rem; overflow-x:auto;"></div>
+    </div>
+  </details>
+</section>
+
+<section>
+  <details id="analysisDetails">
+    <summary><span>Ανάλυση κατηγορίας</span><span class="chev">▸</span></summary>
+    <div class="details-inner">
+      <div class="subhead">Μηνιαία &amp; ετήσια ανάλυση για μία κατηγορία (π.χ. ΕΝΦΙΑ/ΕΦΟΡΙΑ, Ρεύμα, Ύδρευση)</div>
+      <select id="analysisGroup"></select>
+      <select id="analysisYear"></select>
+      <div id="analysisTableWrap" style="margin-top:.7rem; overflow-x:auto;"></div>
+    </div>
+  </details>
+</section>
+
+<section>
+  <details id="exportDetails">
+    <summary><span>Εξαγωγή / Εισαγωγή</span><span class="chev">▸</span></summary>
+    <div class="details-inner">
+      <div class="subhead">Εξαγωγή όλων των καταχωρήσεων</div>
+      <div class="export-grid">
+        <button class="secondary" id="exportExcelBtn">⬇️ Excel (.xlsx)</button>
+        <button class="secondary" id="exportJsonBtn">⬇️ JSON</button>
+      </div>
+      <div class="subhead">Εισαγωγή από αρχείο JSON</div>
+      <div class="import-row">
+        <input type="file" id="importFile" accept="application/json">
+      </div>
+      <div class="danger-zone">
+        <button class="secondary" id="clearAllBtn">🗑️ Διαγραφή όλων των δεδομένων</button>
+      </div>
+    </div>
+  </details>
+</section>
+
+<footer class="note">
+  Τα δεδομένα αποθηκεύονται τοπικά στη συσκευή/browser που ανοίγεις την εφαρμογή. Για να τα έχεις και στο κινητό της συζύγου, κάνε «Εξαγωγή JSON» εδώ και «Εισαγωγή» εκεί (και αντίστροφα όποτε προστίθενται νέες κινήσεις) — δεν γίνεται αυτόματος συγχρονισμός ανάμεσα σε συσκευές.
+</footer>
+
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const EXPENSE_GROUPS = [
+  {id:'market', label:'Super Market'},
+  {id:'laiki', label:'Λαϊκή'},
+  {id:'revma', label:'Ρεύμα', subs:[{id:'thes', label:'Θεσ/κης'},{id:'xorio', label:'Χωριό'}]},
+  {id:'aerio', label:'Φ. Αέριο'},
+  {id:'ydreysi', label:'Ύδρευση', subs:[{id:'thes', label:'Θεσ/κης'},{id:'xorio', label:'Χωριό'}]},
+  {id:'tilefona', label:'Τηλέφωνα / Internet'},
+  {id:'farmaka', label:'Φάρμακα / Υγεία'},
+  {id:'enfia_eforia', label:'ΕΝΦΙΑ / ΕΦΟΡΙΑ', flatSubs:true, subs:[{id:'enfia', label:'ΕΝΦΙΑ'},{id:'eforia', label:'ΕΦΟΡΙΑ'}]},
+  {id:'endysi', label:'Ένδυση'},
+  {id:'ypodysi', label:'Υπόδυση'},
+  {id:'kaysima', label:'Καύσιμα / Συντήρηση ΙΧ'},
+  {id:'eksodos', label:'Έξοδος / Ταβέρνα / Café'},
+  {id:'diafora', label:'Διάφορα'}
+];
+const INCOME_GROUPS = [
+  {id:'misthos', label:'Μισθός'},
+  {id:'ektakto', label:'Έκτακτο έσοδο'},
+  {id:'allo', label:'Άλλο έσοδο'}
+];
+const MONTH_NAMES = ['Ιανουάριος','Φεβρουάριος','Μάρτιος','Απρίλιος','Μάιος','Ιούνιος','Ιούλιος','Αύγουστος','Σεπτέμβριος','Οκτώβριος','Νοέμβριος','Δεκέμβριος'];
+const MONTH_ABBR = ['ΙΑΝ','ΦΕΒ','ΜΑΡ','ΑΠΡ','ΜΑΪ','ΙΟΥΝ','ΙΟΥΛ','ΑΥΓ','ΣΕΠ','ΟΚΤ','ΝΟΕ','ΔΕΚ'];
+
+let state = { entries: [], activeType: 'expense', editingId: null };
+
+function uid(){ return 'e'+Date.now().toString(36)+Math.random().toString(36).slice(2,8); }
+function escapeHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function fmtMoney(n){ return new Intl.NumberFormat('el-GR',{minimumFractionDigits:2,maximumFractionDigits:2}).format(n||0)+' €'; }
+function parseAmount(text){
+  if(!text) return 0;
+  let c = text.trim().replace(/\./g,'').replace(',', '.');
+  if(!/,/.test(text) && (text.match(/\./g)||[]).length===1) c = text.trim().replace(',', '.');
+  c = c.replace(/[^0-9.]/g,'');
+  const v = parseFloat(c);
+  return isNaN(v) ? 0 : v;
+}
+function monthKeyOf(dateStr){ return dateStr.slice(0,7); }
+function groupsFor(type){ return type==='income' ? INCOME_GROUPS : EXPENSE_GROUPS; }
+function findGroup(type, groupId){ return groupsFor(type).find(g=>g.id===groupId); }
+function catLabel(entry){
+  const g = findGroup(entry.type, entry.groupId);
+  if(!g) return entry.groupId;
+  if(entry.subId && g.subs){
+    const s = g.subs.find(s=>s.id===entry.subId);
+    if(g.flatSubs) return s ? s.label : g.label;
+    return g.label + (s ? ' · '+s.label : '');
+  }
+  return g.label;
+}
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), 1800);
+}
+
+const STORAGE_KEY = 'oikonomos_entries_v1';
+let storageDisabled = false;
+
+async function loadData(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    state.entries = raw ? JSON.parse(raw) : [];
+  }catch(e){
+    console.error('Αποτυχία ανάγνωσης localStorage', e);
+    state.entries = [];
+    storageDisabled = true;
+  }
+}
+async function saveData(){
+  try{
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state.entries));
+  }catch(e){
+    console.error('Αποτυχία εγγραφής localStorage', e);
+    storageDisabled = true;
+    showToast('⚠️ Δεν είναι διαθέσιμη μόνιμη αποθήκευση εδώ — εξήγαγε JSON τακτικά');
+    updateStorageBanner();
+  }
+}
+function updateStorageBanner(){
+  const el = document.getElementById('storageBanner');
+  if(!el) return;
+  el.style.display = storageDisabled ? 'block' : 'none';
+}
+
+function categoryOptionsHTML(type){
+  return groupsFor(type).map(g=>{
+    if(g.subs){
+      return g.subs.map(s=>{
+        const text = g.flatSubs ? s.label : (g.label + ' · ' + s.label);
+        return `<option value="${g.id}:${s.id}">${escapeHtml(text)}</option>`;
+      }).join('');
+    }
+    return `<option value="${g.id}:">${escapeHtml(g.label)}</option>`;
+  }).join('');
+}
+
+function setActiveType(type){
+  state.activeType = type;
+  document.getElementById('tabExpense').classList.toggle('active', type==='expense');
+  document.getElementById('tabIncome').classList.toggle('active', type==='income');
+  document.getElementById('entryCategory').innerHTML = categoryOptionsHTML(type);
+  const btn = document.getElementById('submitBtn');
+  btn.dataset.type = type;
+  btn.textContent = state.editingId ? 'Ενημέρωση καταχώρησης' : (type==='income' ? 'Καταχώρηση εσόδου' : 'Καταχώρηση εξόδου');
+}
+
+function resetForm(){
+  state.editingId = null;
+  document.getElementById('entryForm').reset();
+  document.getElementById('entryDate').value = new Date().toISOString().slice(0,10);
+  document.getElementById('cancelEditBtn').style.display = 'none';
+  setActiveType(state.activeType);
+}
+
+function startEdit(id){
+  const e = state.entries.find(x=>x.id===id);
+  if(!e) return;
+  state.editingId = id;
+  setActiveType(e.type);
+  document.getElementById('entryDate').value = e.date;
+  document.getElementById('entryAmount').value = String(e.amount).replace('.', ',');
+  document.getElementById('entryCategory').value = e.groupId+':'+(e.subId||'');
+  document.getElementById('entryDesc').value = e.description||'';
+  document.getElementById('submitBtn').textContent = 'Ενημέρωση καταχώρησης';
+  document.getElementById('cancelEditBtn').style.display = 'inline-block';
+  document.getElementById('formSection').scrollIntoView({behavior:'smooth'});
+}
+
+async function deleteEntry(id){
+  if(!confirm('Διαγραφή αυτής της κίνησης;')) return;
+  state.entries = state.entries.filter(e=>e.id!==id);
+  await saveData();
+  renderAll();
+  showToast('Η κίνηση διαγράφηκε');
+}
+
+function computeCategoryBreakdown(monthEntries){
+  const map = {};
+  monthEntries.filter(e=>e.type==='expense').forEach(e=>{
+    const g = findGroup('expense', e.groupId);
+    if(!g) return;
+    if(!map[g.id]) map[g.id] = {label:g.label, total:0, subs:{}};
+    map[g.id].total += e.amount;
+    if(e.subId && g.subs){
+      const s = g.subs.find(s=>s.id===e.subId);
+      const label = s ? s.label : e.subId;
+      if(!map[g.id].subs[e.subId]) map[g.id].subs[e.subId] = {label, total:0};
+      map[g.id].subs[e.subId].total += e.amount;
+    }
+  });
+  return Object.values(map).sort((a,b)=>b.total-a.total);
+}
+
+function monthLabel(mk){
+  const [y,m] = mk.split('-');
+  return MONTH_NAMES[parseInt(m,10)-1] + ' ' + y;
+}
+
+function getFilteredEntries(){
+  const search = (document.getElementById('searchInput').value||'').trim().toLowerCase();
+  const catFilter = document.getElementById('filterCategory').value;
+  return state.entries.filter(e=>{
+    if(search && !(e.description||'').toLowerCase().includes(search) && !catLabel(e).toLowerCase().includes(search)) return false;
+    if(catFilter && e.groupId!==catFilter) return false;
+    return true;
+  });
+}
+
+function renderFilterCategoryOptions(){
+  const sel = document.getElementById('filterCategory');
+  const current = sel.value;
+  const all = [...EXPENSE_GROUPS, ...INCOME_GROUPS];
+  sel.innerHTML = '<option value="">Όλες οι κατηγορίες</option>' + all.map(g=>`<option value="${g.id}">${escapeHtml(g.label)}</option>`).join('');
+  sel.value = current;
+}
+
+function renderMonths(){
+  const container = document.getElementById('monthsContainer');
+  const filtered = getFilteredEntries();
+  if(state.entries.length===0){
+    container.innerHTML = '<div class="card empty">Δεν υπάρχουν καταχωρήσεις ακόμα. Κάνε την πρώτη σου καταχώρηση παραπάνω 👆</div>';
+    return;
+  }
+  const monthKeys = [...new Set(state.entries.map(e=>monthKeyOf(e.date)))].sort().reverse();
+  const isFiltering = document.getElementById('searchInput').value.trim() !== '' || document.getElementById('filterCategory').value !== '';
+  let html = '';
+  monthKeys.forEach((mk, idx)=>{
+    const monthEntriesAll = state.entries.filter(e=>monthKeyOf(e.date)===mk);
+    const monthEntries = filtered.filter(e=>monthKeyOf(e.date)===mk);
+    if(isFiltering && monthEntries.length===0) return;
+
+    const income = monthEntriesAll.filter(e=>e.type==='income').reduce((s,e)=>s+e.amount,0);
+    const expense = monthEntriesAll.filter(e=>e.type==='expense').reduce((s,e)=>s+e.amount,0);
+    let prevInc=0, prevExp=0;
+    state.entries.forEach(e=>{ if(monthKeyOf(e.date) < mk){ e.type==='income'?prevInc+=e.amount:prevExp+=e.amount; } });
+    const carry = prevInc - prevExp;
+    const total = carry + income - expense;
+
+    const breakdown = computeCategoryBreakdown(monthEntriesAll);
+    const breakdownHtml = breakdown.length ? `<div class="catbreak">` + breakdown.map(g=>{
+      let subsHtml = '';
+      const subEntries = Object.values(g.subs);
+      if(subEntries.length){
+        subsHtml = subEntries.sort((a,b)=>b.total-a.total).map(s=>`<div class="catline sub"><span>${escapeHtml(s.label)}</span><span class="amt">${fmtMoney(s.total)}</span></div>`).join('');
+      }
+      return `<div class="catline"><span>${escapeHtml(g.label)}</span><span class="amt">${fmtMoney(g.total)}</span></div>${subsHtml}`;
+    }).join('') + `</div>` : '';
+
+    const sortedEntries = [...monthEntries].sort((a,b)=> b.date.localeCompare(a.date));
+    const entriesHtml = sortedEntries.length ? sortedEntries.map(e=>`
+      <div class="entry ${e.type}">
+        <div class="left">
+          <div class="date">${e.date.split('-').reverse().join('/')}</div>
+          <div class="cat">${escapeHtml(catLabel(e))}</div>
+          ${e.description ? `<div class="desc">${escapeHtml(e.description)}</div>` : ''}
+        </div>
+        <div class="right">
+          <div class="amt ${e.type}">${e.type==='income'?'+':'-'}${fmtMoney(e.amount)}</div>
+          <div class="actions">
+            <button class="icon-btn" onclick="startEdit('${e.id}')" aria-label="Επεξεργασία">✏️</button>
+            <button class="icon-btn" onclick="deleteEntry('${e.id}')" aria-label="Διαγραφή">🗑️</button>
+          </div>
+        </div>
+      </div>
+    `).join('') : '<div class="empty" style="padding:.8rem;">Καμία κίνηση με αυτά τα φίλτρα.</div>';
+
+    html += `
+      <details ${idx===0 || isFiltering ? 'open' : ''}>
+        <summary>
+          <span>${monthLabel(mk)}</span>
+          <span class="month-meta">
+            <span class="inc">+${fmtMoney(income)}</span>
+            <span class="exp">-${fmtMoney(expense)}</span>
+            <b>${fmtMoney(total)}</b>
+            <span class="chev">▸</span>
+          </span>
+        </summary>
+        <div class="details-inner">
+          ${breakdownHtml}
+          <div class="entries">${entriesHtml}</div>
+        </div>
+      </details>
+    `;
+  });
+  container.innerHTML = html || '<div class="card empty">Καμία κίνηση με αυτά τα φίλτρα.</div>';
+}
+
+function renderYearlySelect(){
+  const sel = document.getElementById('yearlySelect');
+  const years = [...new Set(state.entries.map(e=>e.date.slice(0,4)))].sort().reverse();
+  const current = sel.value;
+  sel.innerHTML = years.map(y=>`<option value="${y}">${y}</option>`).join('');
+  if(years.includes(current)) sel.value = current;
+}
+
+function renderYearlyTable(){
+  const sel = document.getElementById('yearlySelect');
+  const year = sel.value;
+  const stripWrap = document.getElementById('monthStrip');
+  const wrap = document.getElementById('yearlyTableWrap');
+  if(!year){ stripWrap.innerHTML=''; wrap.innerHTML = '<div class="empty">Δεν υπάρχουν δεδομένα.</div>'; return; }
+  const months = [];
+  for(let m=1;m<=12;m++){
+    const mk = year+'-'+String(m).padStart(2,'0');
+    const me = state.entries.filter(e=>monthKeyOf(e.date)===mk);
+    const inc = me.filter(e=>e.type==='income').reduce((s,e)=>s+e.amount,0);
+    const exp = me.filter(e=>e.type==='expense').reduce((s,e)=>s+e.amount,0);
+    months.push({m, mk, inc, exp, bal:inc-exp});
+  }
+  const totInc = months.reduce((s,mo)=>s+mo.inc,0);
+  const totExp = months.reduce((s,mo)=>s+mo.exp,0);
+
+  stripWrap.innerHTML = months.map(mo=>`
+    <div class="month-pill">
+      <span class="mlabel">${MONTH_ABBR[mo.m-1]}</span>
+      <span class="mval">${Math.round(mo.exp).toLocaleString('el-GR')}</span>
+    </div>
+  `).join('') + `<div class="month-pill total"><span class="mlabel">ΣΥΝ</span><span class="mval">${Math.round(totExp).toLocaleString('el-GR')}</span></div>`;
+
+  wrap.innerHTML = `
+    <table class="ytable">
+      <thead><tr><th>Μήνας</th><th>Έσοδα</th><th>Έξοδα</th><th>Υπόλοιπο</th></tr></thead>
+      <tbody>${months.map(mo=>`<tr><td>${MONTH_NAMES[mo.m-1]}</td><td>${fmtMoney(mo.inc)}</td><td>${fmtMoney(mo.exp)}</td><td>${fmtMoney(mo.bal)}</td></tr>`).join('')}</tbody>
+      <tfoot><tr><td>Σύνολο ${year}</td><td>${fmtMoney(totInc)}</td><td>${fmtMoney(totExp)}</td><td>${fmtMoney(totInc-totExp)}</td></tr></tfoot>
+    </table>
+  `;
+}
+
+function renderAnalysisSelectors(){
+  const gsel = document.getElementById('analysisGroup');
+  const currentG = gsel.value;
+  gsel.innerHTML = EXPENSE_GROUPS.map(g=>`<option value="${g.id}">${escapeHtml(g.label)}</option>`).join('');
+  if(EXPENSE_GROUPS.some(g=>g.id===currentG)) gsel.value = currentG;
+  else gsel.value = 'enfia_eforia';
+
+  const ysel = document.getElementById('analysisYear');
+  const years = [...new Set(state.entries.map(e=>e.date.slice(0,4)))].sort().reverse();
+  const currentY = ysel.value;
+  ysel.innerHTML = years.map(y=>`<option value="${y}">${y}</option>`).join('');
+  if(years.includes(currentY)) ysel.value = currentY;
+}
+
+function renderAnalysisTable(){
+  const groupId = document.getElementById('analysisGroup').value;
+  const year = document.getElementById('analysisYear').value;
+  const wrap = document.getElementById('analysisTableWrap');
+  const g = findGroup('expense', groupId);
+  if(!g || !year){ wrap.innerHTML = '<div class="empty">Δεν υπάρχουν δεδομένα.</div>'; return; }
+  const subs = g.subs || [{id:'', label:'Ποσό'}];
+  const yy = year.slice(2);
+  const rows = [];
+  for(let m=1;m<=12;m++){
+    const mk = year+'-'+String(m).padStart(2,'0');
+    const me = state.entries.filter(e=>e.type==='expense' && e.groupId===groupId && monthKeyOf(e.date)===mk);
+    if(me.length===0) continue;
+    const vals = subs.map(s=> me.filter(e=>(e.subId||'')===s.id).reduce((sum,e)=>sum+e.amount,0));
+    const rowTotal = vals.reduce((a,b)=>a+b,0);
+    rows.push({label: m+'/'+yy, vals, rowTotal});
+  }
+  const colTotals = subs.map((s,i)=> rows.reduce((sum,r)=>sum+r.vals[i],0));
+  const grandTotal = colTotals.reduce((a,b)=>a+b,0);
+  if(rows.length===0){ wrap.innerHTML = '<div class="empty">Καμία καταχώρηση σε αυτή την κατηγορία για το '+year+'.</div>'; return; }
+  wrap.innerHTML = `
+    <table class="ytable">
+      <thead><tr><th>Μήνας</th>${subs.map(s=>`<th>${escapeHtml(s.label)}</th>`).join('')}${subs.length>1?'<th>Σύνολο</th>':''}</tr></thead>
+      <tbody>${rows.map(r=>`<tr><td>${r.label}</td>${r.vals.map(v=>`<td>${fmtMoney(v)}</td>`).join('')}${subs.length>1?`<td><b>${fmtMoney(r.rowTotal)}</b></td>`:''}</tr>`).join('')}</tbody>
+      <tfoot><tr><td>Σύνολα</td>${colTotals.map(v=>`<td>${fmtMoney(v)}</td>`).join('')}${subs.length>1?`<td>${fmtMoney(grandTotal)}</td>`:''}</tr></tfoot>
+    </table>
+  `;
+}
+
+function renderAll(){
+  renderFilterCategoryOptions();
+  renderMonths();
+  renderYearlySelect();
+  renderYearlyTable();
+  renderAnalysisSelectors();
+  renderAnalysisTable();
+}
+
+document.getElementById('tabExpense').addEventListener('click', ()=>{ state.editingId=null; document.getElementById('cancelEditBtn').style.display='none'; setActiveType('expense'); });
+document.getElementById('tabIncome').addEventListener('click', ()=>{ state.editingId=null; document.getElementById('cancelEditBtn').style.display='none'; setActiveType('income'); });
+document.getElementById('cancelEditBtn').addEventListener('click', resetForm);
+
+document.getElementById('entryForm').addEventListener('submit', async (ev)=>{
+  ev.preventDefault();
+  const date = document.getElementById('entryDate').value;
+  const amount = parseAmount(document.getElementById('entryAmount').value);
+  const [groupId, subId] = document.getElementById('entryCategory').value.split(':');
+  const description = document.getElementById('entryDesc').value.trim();
+  if(!date || amount<=0){ showToast('⚠️ Συμπλήρωσε ημερομηνία και ποσό μεγαλύτερο από 0'); return; }
+  if(state.editingId){
+    const e = state.entries.find(x=>x.id===state.editingId);
+    Object.assign(e, {date, amount, groupId, subId: subId||null, description, type: state.activeType});
+    showToast('Η κίνηση ενημερώθηκε');
+  }else{
+    state.entries.push({ id: uid(), date, amount, groupId, subId: subId||null, description, type: state.activeType });
+    showToast(state.activeType==='income' ? 'Το έσοδο αποθηκεύτηκε' : 'Το έξοδο αποθηκεύτηκε');
+  }
+  await saveData();
+  resetForm();
+  renderAll();
+});
+
+document.getElementById('searchInput').addEventListener('input', renderMonths);
+document.getElementById('filterCategory').addEventListener('change', renderMonths);
+document.getElementById('yearlySelect').addEventListener('change', renderYearlyTable);
+document.getElementById('analysisGroup').addEventListener('change', renderAnalysisTable);
+document.getElementById('analysisYear').addEventListener('change', renderAnalysisTable);
+
+document.getElementById('exportExcelBtn').addEventListener('click', ()=>{
+  if(state.entries.length===0){ showToast('Δεν υπάρχουν δεδομένα για εξαγωγή'); return; }
+  const rows = [...state.entries].sort((a,b)=>a.date.localeCompare(b.date)).map(e=>{
+    const g = findGroup(e.type, e.groupId);
+    const sub = (g && g.subs && e.subId) ? (g.subs.find(s=>s.id===e.subId)||{}).label || '' : '';
+    return {
+      'Ημερομηνία': e.date.split('-').reverse().join('/'),
+      'Τύπος': e.type==='income' ? 'Έσοδο' : 'Έξοδο',
+      'Κατηγορία': g ? g.label : e.groupId,
+      'Υποκατηγορία': sub,
+      'Περιγραφή': e.description||'',
+      'Ποσό': e.amount
+    };
+  });
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Οικονόμος');
+  XLSX.writeFile(wb, 'oikonomos_' + new Date().toISOString().slice(0,10) + '.xlsx');
+});
+
+document.getElementById('exportJsonBtn').addEventListener('click', ()=>{
+  if(state.entries.length===0){ showToast('Δεν υπάρχουν δεδομένα για εξαγωγή'); return; }
+  const blob = new Blob([JSON.stringify(state.entries, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'oikonomos_' + new Date().toISOString().slice(0,10) + '.json';
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+document.getElementById('importFile').addEventListener('change', async (ev)=>{
+  const file = ev.target.files[0];
+  if(!file) return;
+  try{
+    const text = await file.text();
+    const data = JSON.parse(text);
+    if(!Array.isArray(data)) throw new Error('bad format');
+    let added = 0;
+    data.forEach(item=>{
+      if(item && item.date && typeof item.amount==='number' && item.groupId && item.type){
+        state.entries.push({
+          id: uid(), date: item.date, amount: item.amount, groupId: item.groupId,
+          subId: item.subId||null, description: item.description||'', type: item.type
+        });
+        added++;
+      }
+    });
+    if(added>0){
+      await saveData();
+      renderAll();
+      showToast(`Εισήχθησαν ${added} κινήσεις`);
+    }else{
+      showToast('⚠️ Δεν βρέθηκαν έγκυρες εγγραφές στο αρχείο');
+    }
+  }catch(e){
+    showToast('⚠️ Σφάλμα ανάγνωσης αρχείου JSON');
+  }
+  ev.target.value = '';
+});
+
+document.getElementById('clearAllBtn').addEventListener('click', async ()=>{
+  if(!confirm('Θα διαγραφούν ΟΛΕΣ οι καταχωρήσεις (και για τους δύο χρήστες). Συνέχεια;')) return;
+  if(!confirm('Είσαι σίγουρος/η; Η ενέργεια δεν αναιρείται.')) return;
+  state.entries = [];
+  await saveData();
+  renderAll();
+  showToast('Όλα τα δεδομένα διαγράφηκαν');
+});
+
+(async function init(){
+  document.getElementById('monthsContainer').innerHTML = '<div class="card empty">Φόρτωση...</div>';
+  await loadData();
+  updateStorageBanner();
+  setActiveType('expense');
+  document.getElementById('entryDate').value = new Date().toISOString().slice(0,10);
+  const today = new Date();
+  document.getElementById('stampDate').innerHTML = String(today.getDate()).padStart(2,'0')+'/'+String(today.getMonth()+1).padStart(2,'0')+'<br>'+today.getFullYear();
+  renderAll();
+})();
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  });
+}
+</script>
+</body>
+</html>
