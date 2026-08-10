@@ -258,9 +258,9 @@
         <button class="secondary" id="exportExcelBtn">⬇️ Excel (.xlsx)</button>
         <button class="secondary" id="exportJsonBtn">⬇️ JSON</button>
       </div>
-      <div class="subhead">Εισαγωγή από αρχείο JSON</div>
+      <div class="subhead">Εισαγωγή από αρχείο JSON, Excel (.xlsx) ή CSV</div>
       <div class="import-row">
-        <input type="file" id="importFile" accept="application/json">
+        <input type="file" id="importFile" accept="application/json,.json,.xlsx,.csv,.xls">
       </div>
       <div class="danger-zone">
         <button class="secondary" id="clearAllBtn">🗑️ Διαγραφή όλων των δεδομένων</button>
@@ -617,6 +617,92 @@ function renderAll(){
   renderAnalysisTable();
 }
 
+const LEGACY_CATEGORY_MAP = {
+  'super market': {g:'market'},
+  'λαϊκή': {g:'laiki'},
+  'ρεύμα θεσ/κη': {g:'revma', s:'thes'},
+  'ρεύμα θεσ/κης': {g:'revma', s:'thes'},
+  'ρεύμα χωριό': {g:'revma', s:'xorio'},
+  'φ. αέριο': {g:'aerio'},
+  'φ αέριο': {g:'aerio'},
+  'ύδρευση': {g:'ydreysi', s:'thes'},
+  'ύδρευση θεσ/κης': {g:'ydreysi', s:'thes'},
+  'ύδρευση χωριό': {g:'ydreysi', s:'xorio'},
+  'τηλέφωνα/internet': {g:'tilefona'},
+  'τηλέφωνα / internet': {g:'tilefona'},
+  'φάρμακα/υγεία': {g:'farmaka'},
+  'φάρμακα / υγεία': {g:'farmaka'},
+  'ένδυση': {g:'endysi'},
+  'υπόδυση': {g:'ypodysi'},
+  'ενφια': {g:'enfia_eforia', s:'enfia'},
+  'εφορια': {g:'enfia_eforia', s:'eforia'},
+  'καύσιμα/συντήρηση ιχ': {g:'kaysima'},
+  'καύσιμα / συντήρηση ιχ': {g:'kaysima'},
+  'καφέ/ταβέρνα/έξοδοι': {g:'eksodos'},
+  'έξοδος/ταβέρνα/cafe': {g:'eksodos'},
+  'έξοδος / ταβέρνα / café': {g:'eksodos'},
+  'διάφορα': {g:'diafora'},
+  'μισθός': {g:'misthos'},
+  'έκτακτο έσοδο': {g:'ektakto'},
+  'άλλο έσοδο': {g:'allo'}
+};
+function normKey(s){ return String(s||'').trim().toLowerCase().replace(/\s+/g,' '); }
+function resolveCategory(catRaw, subRaw, type){
+  const groups = groupsFor(type);
+  const cat = normKey(catRaw), sub = normKey(subRaw);
+  if(sub){
+    const g = groups.find(g=>normKey(g.label)===cat);
+    if(g && g.subs){
+      const s = g.subs.find(s=>normKey(s.label)===sub);
+      if(s) return {groupId:g.id, subId:s.id};
+    }
+  }
+  const gExact = groups.find(g=>normKey(g.label)===cat);
+  if(gExact && !gExact.subs) return {groupId:gExact.id, subId:null};
+  const legacy = LEGACY_CATEGORY_MAP[cat];
+  if(legacy && groups.some(g=>g.id===legacy.g)) return {groupId:legacy.g, subId:legacy.s||null};
+  return null;
+}
+function normalizeDate(raw){
+  if(raw instanceof Date && !isNaN(raw)){
+    return raw.getFullYear()+'-'+String(raw.getMonth()+1).padStart(2,'0')+'-'+String(raw.getDate()).padStart(2,'0');
+  }
+  const s = String(raw||'').trim();
+  if(/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0,10);
+  const m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})/);
+  if(m) return m[3]+'-'+m[1].padStart(2,'0')+'-'+m[2].padStart(2,'0');
+  return new Date().toISOString().slice(0,10);
+}
+function readFileAsArrayBuffer(file){
+  return new Promise((resolve, reject)=>{
+    const r = new FileReader();
+    r.onload = ()=>resolve(r.result);
+    r.onerror = reject;
+    r.readAsArrayBuffer(file);
+  });
+}
+async function parseSpreadsheetRows(file){
+  const buf = await readFileAsArrayBuffer(file);
+  const wb = XLSX.read(buf, {type:'array', cellDates:true});
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  return XLSX.utils.sheet_to_json(ws, {defval:''});
+}
+function mapRowToEntry(row){
+  const dateRaw = row['Ημερομηνία'] ?? row['ΗΜΕΡΟΜΗΝΙΑ'] ?? row['Date'] ?? '';
+  const typeRaw = String(row['Τύπος'] ?? row['ΤΥΠΟΣ'] ?? row['Type'] ?? '').trim();
+  const catRaw = String(row['Κατηγορία'] ?? row['ΚΑΤΗΓΟΡΙΑ'] ?? row['Category'] ?? '').trim();
+  const subRaw = String(row['Υποκατηγορία'] ?? row['ΥΠΟΚΑΤΗΓΟΡΙΑ'] ?? '').trim();
+  const desc = String(row['Περιγραφή'] ?? row['ΠΕΡΙΓΡΑΦΗ'] ?? row['Description'] ?? '').trim();
+  const amountRaw = row['Ποσό'] ?? row['ΠΟΣΟ'] ?? row['Amount'] ?? 0;
+  const type = /έσοδ|esod/i.test(typeRaw) ? 'income' : 'expense';
+  const amount = typeof amountRaw === 'number' ? amountRaw : parseAmount(String(amountRaw));
+  const date = normalizeDate(dateRaw);
+  const resolved = resolveCategory(catRaw, subRaw, type);
+  if(!resolved) return null;
+  if(!(date && amount>0)) return null;
+  return { id: uid(), date, amount, groupId: resolved.groupId, subId: resolved.subId, description: desc, type };
+}
+
 document.getElementById('tabExpense').addEventListener('click', ()=>{ state.editingId=null; document.getElementById('cancelEditBtn').style.display='none'; setActiveType('expense'); });
 document.getElementById('tabIncome').addEventListener('click', ()=>{ state.editingId=null; document.getElementById('cancelEditBtn').style.display='none'; setActiveType('income'); });
 document.getElementById('cancelEditBtn').addEventListener('click', resetForm);
@@ -680,29 +766,41 @@ document.getElementById('exportJsonBtn').addEventListener('click', ()=>{
 document.getElementById('importFile').addEventListener('change', async (ev)=>{
   const file = ev.target.files[0];
   if(!file) return;
+  const ext = (file.name.split('.').pop()||'').toLowerCase();
   try{
-    const text = await file.text();
-    const data = JSON.parse(text);
-    if(!Array.isArray(data)) throw new Error('bad format');
-    let added = 0;
-    data.forEach(item=>{
-      if(item && item.date && typeof item.amount==='number' && item.groupId && item.type){
-        state.entries.push({
-          id: uid(), date: item.date, amount: item.amount, groupId: item.groupId,
-          subId: item.subId||null, description: item.description||'', type: item.type
-        });
-        added++;
-      }
-    });
-    if(added>0){
+    let toAdd = [];
+    let unresolved = 0;
+    if(ext === 'json'){
+      const text = await file.text();
+      const data = JSON.parse(text);
+      if(!Array.isArray(data)) throw new Error('bad format');
+      data.forEach(item=>{
+        if(item && item.date && typeof item.amount==='number' && item.groupId && item.type){
+          toAdd.push({ id: uid(), date: item.date, amount: item.amount, groupId: item.groupId, subId: item.subId||null, description: item.description||'', type: item.type });
+        }
+      });
+    }else if(ext==='xlsx' || ext==='xls' || ext==='csv'){
+      const rows = await parseSpreadsheetRows(file);
+      rows.forEach(row=>{
+        const entry = mapRowToEntry(row);
+        if(entry) toAdd.push(entry);
+        else if(Object.values(row).some(v=>String(v).trim()!=='')) unresolved++;
+      });
+    }else{
+      showToast('⚠️ Μη υποστηριζόμενος τύπος αρχείου');
+      ev.target.value=''; return;
+    }
+    if(toAdd.length>0){
+      state.entries.push(...toAdd);
       await saveData();
       renderAll();
-      showToast(`Εισήχθησαν ${added} κινήσεις`);
+      showToast(`Εισήχθησαν ${toAdd.length} κινήσεις` + (unresolved ? ` (${unresolved} γραμμές αγνοήθηκαν)` : ''));
     }else{
       showToast('⚠️ Δεν βρέθηκαν έγκυρες εγγραφές στο αρχείο');
     }
   }catch(e){
-    showToast('⚠️ Σφάλμα ανάγνωσης αρχείου JSON');
+    console.error(e);
+    showToast('⚠️ Σφάλμα ανάγνωσης αρχείου');
   }
   ev.target.value = '';
 });
