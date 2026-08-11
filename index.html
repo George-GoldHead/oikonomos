@@ -776,7 +776,7 @@ document.getElementById('importFile').addEventListener('change', async (ev)=>{
       if(!Array.isArray(data)) throw new Error('bad format');
       data.forEach(item=>{
         if(item && item.date && typeof item.amount==='number' && item.groupId && item.type){
-          toAdd.push({ id: uid(), date: item.date, amount: item.amount, groupId: item.groupId, subId: item.subId||null, description: item.description||'', type: item.type });
+          toAdd.push({ id: uid(), date: normalizeDate(item.date), amount: item.amount, groupId: item.groupId, subId: item.subId||null, description: item.description||'', type: item.type });
         }
       });
     }else if(ext==='xlsx' || ext==='xls' || ext==='csv'){
