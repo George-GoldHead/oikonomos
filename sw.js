@@ -1,4 +1,4 @@
-const CACHE_NAME = 'oikonomos-v1';
+const CACHE_NAME = 'oikonomos-v2';
 const ASSETS = [
   './',
   './index.html',
